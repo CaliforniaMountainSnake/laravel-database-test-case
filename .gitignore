@@ -1,0 +1,7 @@
+/nbproject/
+/.idea/
+/.env
+/REFACTORING.md
+/vendor/
+_ide_helper.php
+.phpstorm.meta.php
