@@ -1,0 +1,63 @@
+dist: bionic
+
+language: php
+
+addons:
+    mariadb: "10.4"
+
+php:
+    - 7.1
+    - 7.2
+    - 7.3
+    - 7.4
+
+jobs:
+    exclude:
+        -   php: 7.1
+            env: LARAVEL_VERSION="~6.0"
+        -   php: 7.1
+            env: LARAVEL_VERSION="^7.0"
+
+env:
+    - LARAVEL_VERSION="~5.5.0"
+    - LARAVEL_VERSION="~5.6.0"
+    - LARAVEL_VERSION="~5.7.0"
+    - LARAVEL_VERSION="~5.8.0"
+    - LARAVEL_VERSION="~6.0"
+    - LARAVEL_VERSION="^7.0"
+
+cache:
+    directories:
+        - $HOME/.composer/cache
+        - $HOME/.cache
+        - node_modules
+        - vendor
+
+before_install:
+    - mkdir test-app && cd test-app
+    - composer create-project laravel/laravel . ${LARAVEL_VERSION} --prefer-dist
+    - composer show laravel/framework
+    - cp -r ../tests/* tests/
+    - cp -r ../tests/Extra/DatabaseSeeder.php database/seeds/
+    - mkdir -p CaliforniaMountainSnake/LaravelDatabaseTestCase && cp -r ../src/* CaliforniaMountainSnake/LaravelDatabaseTestCase/
+    - php -r '$json = json_decode(file_get_contents ("composer.json"), true);$json["autoload"]["psr-4"]["CaliforniaMountainSnake\\"] = "CaliforniaMountainSnake/";file_put_contents("composer.json", json_encode($json, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT));'
+    - sudo mysql -u root -e "CREATE USER 'test_user' IDENTIFIED BY 'test_password';"
+    - sudo mysql -u root -e 'CREATE DATABASE `application_database`;'
+    - sudo mysql -u root -e 'GRANT ALL ON *.* TO `test_user` WITH GRANT OPTION;'
+    - sudo mysql -u root -e 'FLUSH PRIVILEGES;'
+    - composer self-update
+    - composer install
+    - composer require imliam/laravel-env-set-command:^1.0
+    - php artisan env:set DB_CONNECTION mysql
+    - php artisan env:set DB_HOST localhost
+    - php artisan env:set DB_DATABASE application_database
+    - php artisan env:set DB_USERNAME test_user
+    - php artisan env:set DB_PASSWORD test_password
+    - php artisan migrate
+    - php artisan db:seed
+
+script:
+    - vendor/bin/phpunit --verbose
+
+after_script:
+    - echo "Finished!"

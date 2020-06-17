@@ -3,7 +3,7 @@
 namespace CaliforniaMountainSnake\LaravelDatabaseTestCase\Utils;
 
 use Illuminate\Contracts\Console\Kernel;
-use Illuminate\Foundation\Application;
+use Symfony\Component\HttpKernel\HttpKernelInterface;
 
 trait CreatesLaravelApplication
 {
@@ -16,9 +16,9 @@ trait CreatesLaravelApplication
     /**
      * Creates the application.
      *
-     * @return Application
+     * @return HttpKernelInterface
      */
-    public function createApplication(): Application
+    public function createApplication()
     {
         $app = require $this->getAppFilePath();
 

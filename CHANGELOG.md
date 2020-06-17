@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Security
 
 
+## [1.0.0] - 2020-06-17
+### Added
+- The library has been whole rebuilt.
+- Added the really advanced CI-testing on various versions of PHP and Laravel.
+- Echo in the AbstractDatabaseTestCase have been replaced with PSR Logger.
+
 ## [0.1.0] - 2019-07-30
 ### Added
 - The library was created.
+
+[1.0.0]: https://github.com/CaliforniaMountainSnake/laravel-database-test-case/compare/0.1.0...1.0.0
+[0.1.0]: https://github.com/CaliforniaMountainSnake/laravel-database-test-case/compare/5a8c9cbaab988d64973b18853149e63068a68c52...0.1.0

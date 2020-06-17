@@ -3,9 +3,14 @@
 namespace CaliforniaMountainSnake\LaravelDatabaseTestCase;
 
 use CaliforniaMountainSnake\LaravelDatabaseTestCase\Utils\CreatesLaravelApplication;
+use CaliforniaMountainSnake\LaravelDatabaseTestCase\Utils\EchoLogger;
 use CaliforniaMountainSnake\LaravelDatabaseTestCase\Utils\SqlUtils;
 use Illuminate\Foundation\Testing\TestCase as BaseLaravelTestCase;
 use Illuminate\Support\Facades\Config;
+use LogicException;
+use PDO;
+use Psr\Log\LoggerAwareTrait;
+use Psr\Log\LoggerInterface;
 
 /**
  * This is the class intended for the testing the anything that need the database connection in Laravel.
@@ -17,19 +22,31 @@ abstract class AbstractDatabaseTestCase extends BaseLaravelTestCase
 {
     use CreatesLaravelApplication;
     use SqlUtils;
+    use LoggerAwareTrait;
 
+    /**
+     * Prefix of the temporary databases and users.
+     */
     public const TEST_DBNAME_PREFIX = 'test_';
 
     /**
-     * @var \PDO
+     * @var PDO
      */
-    private static $rootPdo;
+    private $rootPdo;
 
     /**
      * @var bool
      */
     private static $isClassInitialized = false;
 
+    /**
+     * @inheritDoc
+     */
+    public function __construct($name = null, array $data = [], $dataName = '')
+    {
+        parent::__construct($name, $data, $dataName);
+        $this->setLogger($this->createLogger());
+    }
 
     /**
      * Load custom test dependencies.
@@ -38,15 +55,19 @@ abstract class AbstractDatabaseTestCase extends BaseLaravelTestCase
 
     /**
      * Get the database connection for the root user.
+     * You are not required to provide a connection for the actual root user.
+     * User of this connection just must have privileges to create and delete databases.
+     *
      * @return string
      */
-    abstract protected static function getRootDbConnection(): string;
+    abstract protected function getRootDbConnection(): string;
 
     /**
      * Get the database connection that contains the migrations table.
+     *
      * @return string
      */
-    abstract protected static function getMigrationDbConnection(): string;
+    abstract protected function getMigrationDbConnection(): string;
 
     /**
      * Get the array with databases connections that will be replaced to the test ones.
@@ -54,75 +75,118 @@ abstract class AbstractDatabaseTestCase extends BaseLaravelTestCase
      *
      * @return string[]
      */
-    abstract protected static function getMockedDbConnections(): array;
+    abstract protected function getMockedDbConnections(): array;
 
+    /**
+     * Do we need to create temporary databases for the mocked connections before the tests?
+     * Sometimes you create databases directly in the migrations.
+     *
+     * @return bool
+     */
+    abstract protected function isCreateMockedDatabases(): bool;
 
+    /**
+     * @inheritDoc
+     */
     public function setUp(): void
     {
         parent::setUp();
+        $this->createRootPdo();
         $this->mockDbConnections();
-        static::createRootPdo();
         $this->initDependencies();
 
         if (self::$isClassInitialized) {
             return;
         }
-        static::createDatabases();
-        static::registerShutdownFunction();
+        $this->createDatabases();
+        $this->registerShutdownFunction();
         $this->deployMigrations();
         $this->seedDatabases();
         self::$isClassInitialized = true;
     }
 
     /**
+     * @return LoggerInterface
+     */
+    protected function createLogger(): LoggerInterface
+    {
+        return new EchoLogger();
+    }
+
+    /**
      * Do we need to seed databases?
+     *
      * @return bool
      */
-    protected static function isSeed(): bool
+    protected function isSeed(): bool
     {
         return true;
     }
 
     /**
      * Do we need to execute migrations?
+     *
      * @return bool
      */
-    protected static function isMigrate(): bool
+    protected function isMigrate(): bool
     {
         return true;
     }
 
     /**
-     * Do we need to create temporary databases for the mocked connections before the tests?
-     * @return bool
+     * @return PDO
      */
-    protected static function isCreateMockedDatabases(): bool
+    protected function getRootPdo(): PDO
     {
-        return false;
+        return $this->rootPdo;
     }
 
     /**
-     * @return \PDO
+     * @return PDO
      */
-    protected static function getRootPdo(): \PDO
+    protected function createRootPdo(): PDO
     {
-        return self::$rootPdo;
+        $dsn = Config::get('database.connections.' . $this->getRootDbConnection() . '.driver')
+            . ':host=' . Config::get('database.connections.' . $this->getRootDbConnection() . '.host')
+            . ';port=' . Config::get('database.connections.' . $this->getRootDbConnection() . '.port');
+        $user = Config::get('database.connections.' . $this->getRootDbConnection() . '.username');
+        $password = Config::get('database.connections.' . $this->getRootDbConnection() . '.password');
+
+        $this->rootPdo = new PDO ($dsn, $user, $password);
+        $this->rootPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        $this->logger->debug('Root PDO created.');
+        return $this->rootPdo;
     }
 
     /**
-     * @return \PDO
+     * @param string $connection
+     *
+     * @return string
      */
-    protected static function createRootPdo(): \PDO
+    protected function resolveMockDatabase(string $connection): string
     {
-        $dsn      = Config::get('database.connections.' . static::getRootDbConnection() . '.driver')
-            . ':host=' . Config::get('database.connections.' . static::getRootDbConnection() . '.host')
-            . ';port=' . Config::get('database.connections.' . static::getRootDbConnection() . '.port');
-        $user     = Config::get('database.connections.' . static::getRootDbConnection() . '.username');
-        $password = Config::get('database.connections.' . static::getRootDbConnection() . '.password');
+        return static::TEST_DBNAME_PREFIX . $connection;
+    }
 
-        self::$rootPdo = new \PDO ($dsn, $user, $password);
-        self::$rootPdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
-        return self::$rootPdo;
+    /**
+     * @param string $connection
+     *
+     * @return string
+     */
+    protected function resolveMockUsername(string $connection): string
+    {
+        return static::TEST_DBNAME_PREFIX . $connection;
+    }
+
+    /**
+     * @param string $connection
+     *
+     * @return string
+     */
+    protected function resolveMockPassword(string $connection): string
+    {
+        return static::TEST_DBNAME_PREFIX . $connection;
     }
 
     /**
@@ -130,85 +194,132 @@ abstract class AbstractDatabaseTestCase extends BaseLaravelTestCase
      */
     private function mockDbConnections(): void
     {
-        $connections = \array_merge(static::getMockedDbConnections(), [static::getMigrationDbConnection()]);
+        $connections = array_merge($this->getMockedDbConnections(), [$this->getMigrationDbConnection()]);
         foreach ($connections as $connection) {
-            Config::set('database.connections.' . $connection . '.database', static::TEST_DBNAME_PREFIX . $connection);
-            Config::set('database.connections.' . $connection . '.username', static::TEST_DBNAME_PREFIX . $connection);
-            Config::set('database.connections.' . $connection . '.password', static::TEST_DBNAME_PREFIX . $connection);
+            $params = [
+                'database.connections.' . $connection . '.database' => $this->resolveMockDatabase($connection),
+                'database.connections.' . $connection . '.username' => $this->resolveMockUsername($connection),
+                'database.connections.' . $connection . '.password' => $this->resolveMockPassword($connection),
+            ];
+
+            foreach ($params as $confKey => $confValue) {
+                Config::set($confKey, $confValue);
+                $this->logger->debug('Config key "' . $confKey . ' has been mocked to "' . $confValue . '"');
+            }
         }
     }
 
-    private static function createDatabases(): void
+    private function createDatabases(): void
     {
-        static::createMigrationsDatabase();
-        static::isCreateMockedDatabases() && static::createMockedDatabases();
+        $this->createMigrationsDatabase();
+        $this->isCreateMockedDatabases() && $this->createMockedDatabases();
     }
 
-    private static function createMigrationsDatabase(): void
+    private function createMigrationsDatabase(): void
     {
-        echo "\n#create_test_migrations_db...";
-        static::createDatabaseAndUser(
-            static::TEST_DBNAME_PREFIX . static::getMigrationDbConnection(),
-            static::TEST_DBNAME_PREFIX . static::getMigrationDbConnection(),
-            static::TEST_DBNAME_PREFIX . static::getMigrationDbConnection()
+        $this->logger->info('Migrations database: creating...');
+        $status = $this->createDatabaseAndUserIfNotExists(
+            $this->resolveMockDatabase($this->getMigrationDbConnection()),
+            $this->resolveMockUsername($this->getMigrationDbConnection()),
+            $this->resolveMockPassword($this->getMigrationDbConnection())
         );
-        echo "ok#\n";
+
+        $this->logger->info('Migrations database: created.');
+        $this->logger->debug('SQL status', $status);
+        $this->logger->debug('DATABASES:', $this->showDatabases());
     }
 
-    private static function createMockedDatabases(): void
+    private function createMockedDatabases(): void
     {
-        echo "\n#create_test_mocked_dbs...";
-        $connections = \array_merge(static::getMockedDbConnections(), [static::getMigrationDbConnection()]);
+        $this->logger->info('Mocked databases: creating...');
+        $connections = array_merge($this->getMockedDbConnections(), [$this->getMigrationDbConnection()]);
         foreach ($connections as $connection) {
-            static::createDatabaseAndUser(
-                static::TEST_DBNAME_PREFIX . $connection,
-                static::TEST_DBNAME_PREFIX . $connection,
-                static::TEST_DBNAME_PREFIX . $connection
+            $status = $this->createDatabaseAndUserIfNotExists(
+                $this->resolveMockDatabase($connection),
+                $this->resolveMockUsername($connection),
+                $this->resolveMockPassword($connection)
             );
+            $this->logger->debug('SQL status of connection "' . $connection . '":', $status);
         }
-
-        echo "ok#\n";
+        $this->logger->info('Mocked databases: created.');
+        $this->logger->debug('DATABASES:', $this->showDatabases());
+        $this->logTables($this->getMockedDbConnections());
     }
 
     private function deployMigrations(): void
     {
-        if (!static::isMigrate()) {
+        if (!$this->isMigrate()) {
             return;
         }
 
-        echo '#migrate...';
+        $this->logger->info('Migrations: executing...');
         $this->artisan('migrate');
-        echo "ok#\n";
+        $this->logger->info('Migrations: executed.');
+
+        $this->logger->debug('DATABASES:', $this->showDatabases());
+        $this->logTables($this->getMockedDbConnections());
     }
 
     private function seedDatabases(): void
     {
-        if (!static::isSeed()) {
+        if (!$this->isSeed()) {
             return;
         }
 
-        echo '#db:seed...';
+        $this->logger->info('Database seeding: executing...');
         $this->artisan('db:seed');
-        echo "ok#\n";
+        $this->logger->info('Database seeding: executed.');
+        $this->logTables($this->getMockedDbConnections());
     }
 
-    private static function dropDatabasesAndUsersIfExist(): void
+    /**
+     * @throws LogicException
+     */
+    private function dropDatabasesAndUsersIfExist(): void
     {
-        echo "\n#drop_test_dbs_and_users...";
-        $connections = \array_merge(static::getMockedDbConnections(), [static::getMigrationDbConnection()]);
+        $this->logger->info('Drop temp databases and users: executing...');
+        $connections = array_merge($this->getMockedDbConnections(), [$this->getMigrationDbConnection()]);
         foreach ($connections as $connection) {
-            static::dropDatabaseAndUserIfExists(
-                static::TEST_DBNAME_PREFIX . $connection,
-                static::TEST_DBNAME_PREFIX . $connection
+            $status = $this->dropDatabaseAndUserIfExists(
+                $this->resolveMockDatabase($connection),
+                $this->resolveMockUsername($connection)
             );
+            $this->logger->debug('SQL status of connection "' . $connection . '":', $status);
         }
-        echo "ok#\n";
+        $this->logger->info('Drop temp databases and users: executed.');
+
+        $databases = $this->showDatabases();
+        $this->logger->debug('DATABASES:', $databases);
+
+        $isDatabasesDeleted = true;
+        foreach ($connections as $connection) {
+            $db = $this->resolveMockDatabase($connection);
+            if (in_array($db, $databases, false)) {
+                $isDatabasesDeleted = false;
+                $this->logger->emergency('Database "' . $db . '" was not deleted!');
+            }
+        }
+
+        if (!$isDatabasesDeleted) {
+            throw new LogicException('Some databases were not deleted, see log.');
+        }
     }
 
-    private static function registerShutdownFunction(): void
+    /**
+     * @param array $connections
+     */
+    private function logTables(array $connections): void
     {
-        \register_shutdown_function(static function () {
-            static::dropDatabasesAndUsersIfExist();
+        foreach ($connections as $connection) {
+            $this->logger->debug('TABLES of "' . $this->resolveMockDatabase($connection) . '":',
+                $this->showTables($connection));
+        }
+    }
+
+    private function registerShutdownFunction(): void
+    {
+        register_shutdown_function(function () {
+            $this->dropDatabasesAndUsersIfExist();
         });
     }
 }
