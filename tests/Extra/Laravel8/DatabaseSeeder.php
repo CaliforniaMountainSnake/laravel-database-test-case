@@ -3,7 +3,7 @@
 use Illuminate\Database\Seeder;
 use App\User;
 
-class DatabaseSeederLaravel8Plus extends Seeder
+class DatabaseSeeder extends Seeder
 {
     /**
      * Seed the application's database.

@@ -43,7 +43,7 @@ before_install:
     - composer show laravel/framework
     - cp -r ../tests/* tests/
     - cp ../tests/Extra/DatabaseSeeder.php database/seeds/DatabaseSeeder.php || true
-    - cp ../tests/Extra/DatabaseSeederLaravel8Plus.php database/seeders/DatabaseSeeder.php || true
+    - cp ../tests/Extra/Laravel8/DatabaseSeeder.php database/seeders/DatabaseSeeder.php || true
     - composer dump-autoload
     - mkdir -p CaliforniaMountainSnake/LaravelDatabaseTestCase && cp -r ../src/* CaliforniaMountainSnake/LaravelDatabaseTestCase/
     - php -r '$json = json_decode(file_get_contents ("composer.json"), true);$json["autoload"]["psr-4"]["CaliforniaMountainSnake\\"] = "CaliforniaMountainSnake/";file_put_contents("composer.json", json_encode($json, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT));'
