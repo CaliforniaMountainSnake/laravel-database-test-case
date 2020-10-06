@@ -38,13 +38,12 @@ cache:
         - vendor
 
 before_install:
-    - laravel8plus () [[ "$LARAVEL_VERSION" == "^8.0" ]]
     - mkdir test-app && cd test-app
     - composer create-project laravel/laravel . ${LARAVEL_VERSION} --prefer-dist
     - composer show laravel/framework
     - cp -r ../tests/* tests/
-    - laravel8plus || cp -r ../tests/Extra/DatabaseSeeder.php database/seeds/
-    - laravel8plus && cp -r ../tests/Extra/DatabaseSeederLaravel8Plus.php database/seeders/
+    - cp ../tests/Extra/DatabaseSeeder.php database/seeds/DatabaseSeeder.php || true
+    - cp ../tests/Extra/DatabaseSeederLaravel8Plus.php database/seeders/DatabaseSeeder.php || true
     - mkdir -p CaliforniaMountainSnake/LaravelDatabaseTestCase && cp -r ../src/* CaliforniaMountainSnake/LaravelDatabaseTestCase/
     - php -r '$json = json_decode(file_get_contents ("composer.json"), true);$json["autoload"]["psr-4"]["CaliforniaMountainSnake\\"] = "CaliforniaMountainSnake/";file_put_contents("composer.json", json_encode($json, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT));'
     - sudo mysql -u root -e "CREATE USER 'test_user' IDENTIFIED BY 'test_password';"
