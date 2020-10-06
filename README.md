@@ -13,8 +13,8 @@ It creates temporary user and databases, perform your migrations and seeds datab
 And, of course, your usual database will not be affected.
 
 ## Compatibility
-This library supports `PHP ^7.1` and a lot of versions of Laravel: `^5.5`, `^6.0`, `^7.0`.
-The main condition: you must to have a mysql user that have privileges to create and delete other users and databases (for creation and deletion temp user and databases).
+This library supports `PHP ^7.1` and a lot of versions of Laravel: `^5.5`, `^6.0`, `^7.0`, `^8.0`.
+The main condition: you must have a mysql user that have privileges to create and delete other users and databases (for creation and deletion temp user and databases).
 
 
 ## Install:
