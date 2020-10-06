@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Security
 
 
+## [1.0.5] - 2020-10-06
+### Fixed
+- Fixed compatibility of the CI test with Laravel 8.x.
+
 ## [1.0.4] - 2020-10-06
 ### Fixed
 - Fixed compatibility of the CI test with Laravel 8.x.
@@ -38,6 +42,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - The library has been created.
 
+[1.0.5]: https://github.com/CaliforniaMountainSnake/laravel-database-test-case/compare/1.0.4...1.0.5
 [1.0.4]: https://github.com/CaliforniaMountainSnake/laravel-database-test-case/compare/1.0.3...1.0.4
 [1.0.3]: https://github.com/CaliforniaMountainSnake/laravel-database-test-case/compare/1.0.2...1.0.3
 [1.0.2]: https://github.com/CaliforniaMountainSnake/laravel-database-test-case/compare/1.0.1...1.0.2
